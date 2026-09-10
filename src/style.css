@@ -58,6 +58,8 @@ body {
 
 #text p { margin: 0 0 1em; white-space: pre-wrap; }
 #text p.item { color: var(--dim); }
+#text p.line { padding-left: 1.2em; text-indent: -1.2em; }
+#text p.line .who { color: var(--dim); font-size: 0.85em; letter-spacing: 0.06em; text-transform: uppercase; }
 #choices button.item { border-style: dashed; }
 #text p.silence { color: var(--silence); font-style: italic; }
 #text p.memory { color: var(--accent); }

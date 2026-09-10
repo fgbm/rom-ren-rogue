@@ -94,8 +94,18 @@ export function createRenderer(
       for (const p of scene.text(state)) {
         if (p === "") continue;
         const el = document.createElement("p");
-        if (typeof p === "string") el.textContent = p;
-        else if ("silence" in p) {
+        if (typeof p === "string") {
+          // «Имя: — реплика» → имя говорящего приглушённо перед репликой.
+          const m = /^([А-ЯЁA-Z0-9][^:—]{0,24}): — (.*)$/s.exec(p);
+          if (m) {
+            const who = document.createElement("span");
+            who.className = "who";
+            who.textContent = m[1];
+            el.appendChild(who);
+            el.appendChild(document.createTextNode(" — " + m[2]));
+            el.classList.add("line");
+          } else el.textContent = p;
+        } else if ("silence" in p) {
           el.textContent = p.silence;
           el.className = "silence";
         } else if ("memory" in p) {
