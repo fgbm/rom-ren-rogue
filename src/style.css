@@ -1,0 +1,64 @@
+:root {
+  --bg: #0a0b0d;
+  --fg: #c9d1c8;
+  --dim: #6b736a;
+  --accent: #7fd1b9;
+  --warn: #d17f7f;
+  --silence: #8a8fd1;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+#app {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 16px 64px;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#status {
+  color: var(--dim);
+  font-size: 13px;
+  border-bottom: 1px solid #1f2326;
+  padding-bottom: 8px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+#status span b { color: var(--fg); font-weight: normal; }
+#status .low { color: var(--warn); }
+
+#text p { margin: 0 0 1em; white-space: pre-wrap; }
+#text p.silence { color: var(--silence); font-style: italic; }
+#text p.memory { color: var(--accent); }
+
+#choices { display: flex; flex-direction: column; gap: 8px; margin-top: 24px; }
+
+#choices button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid #2a2f33;
+  padding: 10px 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+#choices button:hover { border-color: var(--accent); color: var(--accent); }
+#choices button.memory { border-color: var(--accent); }
+#choices button:disabled { color: var(--dim); cursor: default; border-style: dashed; }
+
+.silence-mode #status, .silence-mode #choices button { opacity: 0.35; }
