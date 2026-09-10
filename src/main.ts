@@ -1,5 +1,5 @@
 import { Game } from "./engine/game";
-import { loadMeta, newRun } from "./engine/state";
+import { loadMeta, loadRun, newRun } from "./engine/state";
 import type { GameState } from "./engine/types";
 import { act1 } from "./content/act1";
 import { act2 } from "./content/act2";
@@ -8,7 +8,8 @@ import { metaScenes } from "./content/meta";
 import { createRenderer } from "./ui";
 
 const meta = loadMeta();
-const state: GameState = { meta, run: newRun("velt") };
+const saved = loadRun();
+const state: GameState = { meta, run: saved?.run ?? newRun("velt") };
 
 let game: Game;
 const renderer = createRenderer(
@@ -25,8 +26,11 @@ game = new Game([...metaScenes, ...act1, ...act2, ...act3], state, renderer, {
   flatline: "flatline",
 });
 
-// Первый запуск: сразу в забег. Повторный: экран выбора заказчика.
-if (meta.runs === 0) {
+// Обновление страницы: продолжить с сохранённой сцены.
+// Первый запуск: сразу в забег. Иначе: экран выбора заказчика.
+if (saved && game.resume(saved.scene)) {
+  // восстановлено
+} else if (meta.runs === 0) {
   state.meta.runs = 1;
   game.goto("k1_load");
 } else {

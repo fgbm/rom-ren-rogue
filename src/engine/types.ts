@@ -99,6 +99,8 @@ export interface Scene {
   onEnter?: Effect;
   /** Сцена без интерфейса (узел Тишины). */
   silence?: boolean;
+  /** Магазин: недоступные по кредиту выборы показываются с ценой. Иначе скрываются. */
+  shop?: boolean;
 }
 
 export interface ActConfig {

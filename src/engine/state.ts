@@ -73,6 +73,36 @@ export function saveMeta(meta: MetaState): void {
 
 export function wipeMeta(): void {
   localStorage.removeItem(KEY);
+  localStorage.removeItem(RUN_KEY);
+}
+
+// ---- текущий забег (переживает обновление страницы)
+
+const RUN_KEY = "rom-ren-run-v1";
+
+export interface SavedRun {
+  run: Omit<RunState, "flags"> & { flags: string[] };
+  scene: string;
+}
+
+export function saveRun(run: RunState, scene: string): void {
+  const saved: SavedRun = { run: { ...run, flags: [...run.flags] }, scene };
+  localStorage.setItem(RUN_KEY, JSON.stringify(saved));
+}
+
+export function loadRun(): { run: RunState; scene: string } | null {
+  try {
+    const raw = localStorage.getItem(RUN_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as SavedRun;
+    return { run: { ...j.run, flags: new Set(j.run.flags ?? []) }, scene: j.scene };
+  } catch {
+    return null;
+  }
+}
+
+export function clearRun(): void {
+  localStorage.removeItem(RUN_KEY);
 }
 
 // ---- память

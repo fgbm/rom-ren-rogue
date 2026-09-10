@@ -1,5 +1,5 @@
-import type { Renderer } from "./engine/game";
-import type { Choice, GameState, Scene } from "./engine/types";
+import type { Game, Renderer } from "./engine/game";
+import type { Choice, GameState, ItemId, Scene } from "./engine/types";
 import { memoryCount } from "./engine/state";
 import { ITEMS } from "./engine/items";
 
@@ -18,14 +18,58 @@ const ACT_NAMES: Record<number, string> = {
   3: "Блуждающий Огонь",
 };
 
+/**
+ * Штриховка текста пропорционально дефициту. Заштрихованные символы выбираются
+ * детерминированно по позиции, чтобы одна и та же реплика при одном дефиците
+ * выглядела одинаково между рендерами.
+ */
+function shade(text: string, deficit: number): string {
+  const ratio = Math.min(1, Math.max(0.35, deficit));
+  let h = 2166136261;
+  const out: string[] = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    h = Math.imul(h ^ text.charCodeAt(i) ^ i, 16777619) >>> 0;
+    if (ch === " " || ch === "—" || ch === ".") {
+      out.push(ch);
+      continue;
+    }
+    out.push((h % 1000) / 1000 < ratio ? "▒" : ch);
+  }
+  return out.join("");
+}
+
 export function createRenderer(
   onChoose: (c: Choice) => void,
-  locked: (c: Choice) => "memory" | "credit" | null,
+  locked: Game["locked"],
 ): Renderer {
   const status = document.getElementById("status")!;
   const text = document.getElementById("text")!;
   const choices = document.getElementById("choices")!;
   const inv = document.getElementById("inventory")!;
+  const itemDesc = document.getElementById("item-desc")!;
+  let openItem: ItemId | null = null;
+
+  function renderInventory(items: ItemId[]) {
+    inv.innerHTML = "";
+    if (!items.length) {
+      inv.innerHTML = `<span class="dim">пусто</span>`;
+      itemDesc.textContent = "";
+      return;
+    }
+    if (openItem && !items.includes(openItem)) openItem = null;
+    for (const id of items) {
+      const el = document.createElement("span");
+      el.textContent = ITEMS[id].name;
+      el.className = openItem === id ? "open" : "";
+      el.onclick = () => {
+        openItem = openItem === id ? null : id;
+        renderInventory(items);
+      };
+      inv.appendChild(el);
+    }
+    itemDesc.textContent = openItem ? ITEMS[openItem].desc : "";
+  }
 
   return {
     render(scene: Scene, state: GameState, visible: Choice[]) {
@@ -44,11 +88,7 @@ export function createRenderer(
         .map((s) => `<span>${s}</span>`)
         .join("");
 
-      inv.innerHTML = r.items.length
-        ? r.items
-            .map((id) => `<span title="${ITEMS[id].desc}">${ITEMS[id].name}</span>`)
-            .join("")
-        : `<span class="dim">пусто</span>`;
+      renderInventory(r.items);
 
       text.innerHTML = "";
       for (const p of scene.text(state)) {
@@ -82,7 +122,12 @@ export function createRenderer(
         const l = locked(c);
         if (l) {
           b.disabled = true;
-          b.textContent = (l === "memory" ? "▒▒▒ " : "не хватает кредита: ") + label;
+          if (l.kind === "memory") {
+            b.textContent = shade(c.text, l.deficit);
+            b.title = "память";
+          } else {
+            b.textContent = "не хватает кредита: " + label;
+          }
         }
         b.onclick = () => onChoose(c);
         choices.appendChild(b);

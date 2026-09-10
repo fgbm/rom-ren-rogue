@@ -1,5 +1,5 @@
 import type { ActConfig, Choice, GameState, Scene } from "./types";
-import { has, memoryCount, saveMeta, useItem } from "./state";
+import { has, memoryCount, saveMeta, saveRun, useItem } from "./state";
 
 /** Сцена пула уходит из ротации после стольких просмотров за всё время. */
 const POOL_RETIRE_AFTER = 6;
@@ -42,7 +42,17 @@ export class Game {
     if (sc.pool) this.state.run.poolShown += 1;
     sc.onEnter?.(this.state);
     saveMeta(this.state.meta);
+    saveRun(this.state.run, id);
     this.renderer.render(sc, this.state, this.visibleChoices(sc));
+  }
+
+  /** Восстановить сцену после обновления страницы: без onEnter и без записи посещения. */
+  resume(id: string): boolean {
+    const sc = this.scenes.get(id);
+    if (!sc) return false;
+    this.current = sc;
+    this.renderer.render(sc, this.state, this.visibleChoices(sc));
+    return true;
   }
 
   choose(choice: Choice): void {
@@ -58,14 +68,22 @@ export class Game {
     return sc.choices.filter((c) => {
       if (c.when && !c.when(this.state)) return false;
       if (c.item && !has(this.state, c.item)) return false;
+      // Вне магазина недоступные по кредиту выборы не показываем: Виейра их просто не предлагает.
+      if (c.cost !== undefined && !sc.shop && this.state.run.credit < c.cost) return false;
       return true;
     });
   }
 
-  /** Заблокирован ли выбор (память или деньги). */
-  locked(c: Choice): "memory" | "credit" | null {
-    if (c.memory !== undefined && memoryCount(this.state) < c.memory) return "memory";
-    if (c.cost !== undefined && this.state.run.credit < c.cost) return "credit";
+  /**
+   * Заблокирован ли выбор. Для памяти возвращает долю дефицита 0..1:
+   * чем больше не хватает, тем сильнее штриховка.
+   */
+  locked(c: Choice): { kind: "memory"; deficit: number } | { kind: "credit" } | null {
+    if (c.memory !== undefined && memoryCount(this.state) < c.memory) {
+      const have = memoryCount(this.state);
+      return { kind: "memory", deficit: (c.memory - have) / c.memory };
+    }
+    if (c.cost !== undefined && this.state.run.credit < c.cost) return { kind: "credit" };
     return null;
   }
 

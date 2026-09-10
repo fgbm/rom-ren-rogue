@@ -49,9 +49,12 @@ body {
   gap: 12px;
   flex-wrap: wrap;
 }
-#inventory span { border: 1px dashed #2a2f33; padding: 1px 8px; cursor: help; }
+#inventory span { border: 1px dashed #2a2f33; padding: 1px 8px; cursor: pointer; user-select: none; }
 #inventory span:hover { color: var(--fg); border-color: var(--fg); }
-#inventory .dim { border: none; }
+#inventory span.open { color: var(--accent); border-color: var(--accent); border-style: solid; }
+#inventory .dim { border: none; cursor: default; }
+#item-desc { color: var(--dim); font-size: 13px; margin: -16px 0 24px; min-height: 1.2em; }
+#item-desc:empty { margin: -20px 0 20px; }
 
 #text p { margin: 0 0 1em; white-space: pre-wrap; }
 #text p.item { color: var(--dim); }
