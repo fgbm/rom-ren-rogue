@@ -41,7 +41,21 @@ body {
 #status span b { color: var(--fg); font-weight: normal; }
 #status .low { color: var(--warn); }
 
+#inventory {
+  color: var(--dim);
+  font-size: 13px;
+  margin: -16px 0 24px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+#inventory span { border: 1px dashed #2a2f33; padding: 1px 8px; cursor: help; }
+#inventory span:hover { color: var(--fg); border-color: var(--fg); }
+#inventory .dim { border: none; }
+
 #text p { margin: 0 0 1em; white-space: pre-wrap; }
+#text p.item { color: var(--dim); }
+#choices button.item { border-style: dashed; }
 #text p.silence { color: var(--silence); font-style: italic; }
 #text p.memory { color: var(--accent); }
 
