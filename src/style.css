@@ -81,3 +81,24 @@ body {
 #choices button:disabled { color: var(--dim); cursor: default; border-style: dashed; }
 
 .silence-mode #status, .silence-mode #choices button { opacity: 0.35; }
+
+/* ---- v2: локации, регистры, новые абзацы */
+
+#title { font-size: 13px; font-weight: normal; color: var(--dim); letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 16px; }
+#places { color: var(--dim); font-size: 13px; margin: -16px 0 16px; }
+#places:empty { margin: 0; }
+#places ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+#places li::before { content: "· "; }
+#places li.here { color: var(--fg); }
+#status .places-btn { cursor: pointer; border: 1px dashed #2a2f33; padding: 0 8px; user-select: none; margin-left: auto; }
+#status .places-btn:hover, #status .places-btn.open { color: var(--fg); border-color: var(--fg); }
+
+#text p.rust { color: #c9906b; font-style: italic; letter-spacing: 0.02em; }
+#text p.echo { color: var(--fg); opacity: 0.85; }
+#text p.dossier { color: var(--dim); font-size: 0.9em; border-left: 2px solid #2a2f33; padding-left: 10px; }
+#text p.intrusion { color: #d1b37f; font-style: italic; padding-left: 1.5em; }
+body.dry #text p { line-height: 1.45; }
+#choices button.exit { border-color: #1f2326; color: var(--dim); }
+#choices button.exit:hover { color: var(--accent); border-color: var(--accent); }
+.rust-mode #status, .rust-mode #choices button { opacity: 0.35; }
+.rust-mode { --silence: #c9906b; }

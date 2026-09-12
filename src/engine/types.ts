@@ -1,8 +1,7 @@
-// Типы движка. Контент описывается данными, движок ничего не знает о сюжете.
+// Состояние игры и модель представления. Движок ничего не знает о сюжете:
+// весь контент приходит из скомпилированной программы (src/rom/ast.ts).
 
-export type Client = "velt" | "marsh" | "zero" | "moriyama" | "hanna" | "silence";
-
-export type MemoryKind = "own" | "hanna" | "foreign";
+import type { MemoryKind, ParaKind } from "../rom/ast.ts";
 
 export interface MemoryFragment {
   id: string;
@@ -10,38 +9,24 @@ export interface MemoryFragment {
   text: string;
 }
 
-export type ItemId =
-  | "ice_old" // старый ледокол
-  | "ice_kuang" // «Куан» одиннадцатой марки, китайский
-  | "mask" // маска-имитатор: сбрасывает внимание
-  | "patch" // патч носителя: чинит целостность
-  | "manifest" // маршрутный лист на Фрисайд
-  | "simstim" // симстим-канал к Виейре
-  | "dub" // даб-запись Дзиона, пропуск в доки
-  | "marsh_paper" // бумага Марш: охранная грамота Тьюринга
-  | "shard" // осколок чужого конструкта
-  | "lobotomy"; // лоботомирующий софт Марш
-
-export interface ItemDef {
-  id: ItemId;
-  name: string;
-  desc: string;
-  /** Сгорает при применении. */
-  consumable: boolean;
-}
-
 /** Состояние одного забега. Сгорает при выгрузке. */
 export interface RunState {
-  client: Client;
-  act: 1 | 2 | 3;
+  order: string;
+  client: string;
+  loc: string;
   credit: number;
-  attention: number; // 0..5, при 5 — Тьюринг перехватывает забег
-  integrity: number; // 0..3, при 0 — выгрузка
-  items: ItemId[];
+  attention: number; // 0..5
+  integrity: number; // 0..3
+  items: string[];
   flags: Set<string>;
+  /** Сцены, показанные в этом забеге. */
   visited: string[];
-  /** Сколько сцен из пула показано в текущем акте. */
-  poolShown: number;
+  /** Локации в порядке первого посещения. */
+  visitedLocs: string[];
+  /** Развязка заказа показана. */
+  finished: boolean;
+  /** В текущую локацию только что пришли: событие пула ещё не разыграно. */
+  arrived: boolean;
 }
 
 /** Состояние между забегами. Копится. */
@@ -51,8 +36,9 @@ export interface MetaState {
   dossier: Set<string>;
   reputation: Record<string, number>;
   seenScenes: Record<string, number>;
-  unlockedClients: Client[];
+  unlockedClients: string[];
   endings: number[];
+  ordersDone: Record<string, number>;
 }
 
 export interface GameState {
@@ -60,52 +46,33 @@ export interface GameState {
   meta: MetaState;
 }
 
-export type Condition = (s: GameState) => boolean;
-export type Effect = (s: GameState) => void;
+export type ViewPtr = { kind: "scene"; id: string } | { kind: "hub" } | { kind: "orders" };
 
-/** "@next" — отдать решение режиссёру. */
-export type Next = string | ((s: GameState) => string);
-
-export interface Choice {
+export interface RPara {
+  kind: ParaKind;
   text: string;
-  /** Условие показа. Если не выполнено, выбор скрыт. */
-  when?: Condition;
-  /** Требует памяти: показан, помечен, но заблокирован. */
-  memory?: number;
-  /** Требует предмет. Показан только если предмет есть. Расходники сгорают. */
-  item?: ItemId;
-  /** Стоимость в кредитах. Показан всегда, заблокирован без денег. */
+}
+
+export type Lock = { kind: "memory"; deficit: number } | { kind: "credit" } | null;
+
+export interface RChoice {
+  label: string;
+  kind: "choice" | "exit" | "order";
+  locked: Lock;
+  item?: string;
+  memory?: boolean;
   cost?: number;
-  effect?: Effect;
-  next: Next;
 }
 
-export type Paragraph =
-  | string
-  | { silence: string }
-  | { memory: string }
-  | { item: string };
-
-export interface Scene {
-  id: string;
-  act: 1 | 2 | 3;
-  /** Ключевая сцена: появляется по триггеру, приоритет над пулом. */
-  key?: boolean;
-  /** Сцена из пула: выбирается случайно между ключами. */
-  pool?: boolean;
-  when?: Condition;
-  text: (s: GameState) => Paragraph[];
-  choices: Choice[];
-  onEnter?: Effect;
-  /** Сцена без интерфейса (узел Тишины). */
-  silence?: boolean;
-  /** Магазин: недоступные по кредиту выборы показываются с ценой. Иначе скрываются. */
-  shop?: boolean;
-}
-
-export interface ActConfig {
-  /** Сколько сцен пула показать до выхода из акта. */
-  poolLength: number;
-  /** Сцена выхода из акта. */
-  exit: string;
+export interface View {
+  ptr: ViewPtr;
+  /** Название локации для хаба. */
+  title?: string;
+  paras: RPara[];
+  choices: RChoice[];
+  silence: boolean;
+  rust: boolean;
+  /** Целостность 1: текст рвётся. */
+  noise: boolean;
+  register?: "dry" | "rich";
 }

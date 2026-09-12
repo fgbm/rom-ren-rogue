@@ -1,108 +1,115 @@
-import type { Client, GameState, ItemId, MetaState, RunState } from "./types";
-import { ITEMS } from "./items";
+import type { Program } from "../rom/ast.ts";
+import type { GameState, MemoryFragment, MetaState, RunState, ViewPtr } from "./types.ts";
 
-const KEY = "rom-ren-meta-v2";
+// ---- хранилище. В браузере localStorage, в симуляторе память.
 
-export function newRun(client: Client): RunState {
-  const base: RunState = {
-    client,
-    act: 1,
-    credit: 1200,
-    attention: 1,
-    integrity: 3,
-    items: ["ice_old"],
-    flags: new Set(),
-    visited: [],
-    poolShown: 0,
-  };
-  switch (client) {
-    case "velt":
-      base.credit = 3000;
-      break;
-    case "marsh":
-      base.credit = 800;
-      base.attention = 0;
-      base.items.push("marsh_paper");
-      break;
-    case "zero":
-      base.credit = 600;
-      base.items.push("dub");
-      break;
-    case "moriyama":
-      base.credit = 900;
-      base.items.push("patch");
-      break;
-    case "hanna":
-      base.credit = 2000;
-      base.attention = 2;
-      break;
-    case "silence":
-      base.credit = 0;
-      base.items = [];
-      break;
-  }
-  return base;
+export interface KV {
+  get(k: string): string | null;
+  set(k: string, v: string): void;
+  del(k: string): void;
 }
 
-export function newMeta(): MetaState {
+export function browserKV(): KV {
+  return {
+    get: (k) => localStorage.getItem(k),
+    set: (k, v) => localStorage.setItem(k, v),
+    del: (k) => localStorage.removeItem(k),
+  };
+}
+
+export function memoryKV(): KV {
+  const m = new Map<string, string>();
+  return {
+    get: (k) => m.get(k) ?? null,
+    set: (k, v) => void m.set(k, v),
+    del: (k) => void m.delete(k),
+  };
+}
+
+const META_KEY = "rom-ren-meta-v3";
+const RUN_KEY = "rom-ren-run-v3";
+
+// ---- забег
+
+export function newRun(p: Program, orderId: string): RunState {
+  const o = p.orders[orderId];
+  const c = p.clients[o.client];
+  return {
+    order: orderId,
+    client: c.id,
+    loc: o.start,
+    credit: c.credit,
+    attention: c.attention,
+    integrity: 3,
+    items: [...c.items],
+    flags: new Set(),
+    visited: [],
+    visitedLocs: [o.start],
+    finished: false,
+    arrived: true,
+  };
+}
+
+interface SavedRun {
+  run: Omit<RunState, "flags"> & { flags: string[] };
+  ptr: ViewPtr;
+}
+
+export function saveRun(kv: KV, run: RunState, ptr: ViewPtr): void {
+  const saved: SavedRun = { run: { ...run, flags: [...run.flags] }, ptr };
+  kv.set(RUN_KEY, JSON.stringify(saved));
+}
+
+export function loadRun(kv: KV): { run: RunState; ptr: ViewPtr } | null {
+  try {
+    const raw = kv.get(RUN_KEY);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as SavedRun;
+    return { run: { ...j.run, flags: new Set(j.run.flags ?? []) }, ptr: j.ptr };
+  } catch {
+    return null;
+  }
+}
+
+export function clearRun(kv: KV): void {
+  kv.del(RUN_KEY);
+}
+
+// ---- мета
+
+export function newMeta(p: Program): MetaState {
   return {
     runs: 0,
     memory: [],
     dossier: new Set(),
     reputation: {},
     seenScenes: {},
-    unlockedClients: ["velt"],
+    unlockedClients: Object.values(p.clients)
+      .filter((c) => c.unlocked)
+      .map((c) => c.id),
     endings: [],
+    ordersDone: {},
   };
 }
 
-export function loadMeta(): MetaState {
+export function loadMeta(kv: KV, p: Program): MetaState {
   try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return newMeta();
+    const raw = kv.get(META_KEY);
+    if (!raw) return newMeta(p);
     const j = JSON.parse(raw);
-    return { ...newMeta(), ...j, dossier: new Set(j.dossier ?? []) };
+    return { ...newMeta(p), ...j, dossier: new Set(j.dossier ?? []) };
   } catch {
-    return newMeta();
+    return newMeta(p);
   }
 }
 
-export function saveMeta(meta: MetaState): void {
-  localStorage.setItem(KEY, JSON.stringify({ ...meta, dossier: [...meta.dossier] }));
+export function saveMeta(kv: KV, meta: MetaState): void {
+  kv.set(META_KEY, JSON.stringify({ ...meta, dossier: [...meta.dossier] }));
 }
 
-export function wipeMeta(): void {
-  localStorage.removeItem(KEY);
-  localStorage.removeItem(RUN_KEY);
-}
-
-// ---- текущий забег (переживает обновление страницы)
-
-const RUN_KEY = "rom-ren-run-v1";
-
-export interface SavedRun {
-  run: Omit<RunState, "flags"> & { flags: string[] };
-  scene: string;
-}
-
-export function saveRun(run: RunState, scene: string): void {
-  const saved: SavedRun = { run: { ...run, flags: [...run.flags] }, scene };
-  localStorage.setItem(RUN_KEY, JSON.stringify(saved));
-}
-
-export function loadRun(): { run: RunState; scene: string } | null {
-  try {
-    const raw = localStorage.getItem(RUN_KEY);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as SavedRun;
-    return { run: { ...j.run, flags: new Set(j.run.flags ?? []) }, scene: j.scene };
-  } catch {
-    return null;
-  }
-}
-
-export function clearRun(): void {
-  localStorage.removeItem(RUN_KEY);
+export function wipeAll(kv: KV): void {
+  kv.del(META_KEY);
+  kv.del(RUN_KEY);
 }
 
 // ---- память
@@ -111,51 +118,33 @@ export function memoryCount(s: GameState): number {
   return s.meta.memory.length;
 }
 
+export function memoryOf(s: GameState, kind: MemoryFragment["kind"]): number {
+  return s.meta.memory.filter((m) => m.kind === kind).length;
+}
+
 export function hasMemory(s: GameState, id: string): boolean {
   return s.meta.memory.some((m) => m.id === id);
 }
 
-export function memoryOf(s: GameState, kind: "own" | "hanna" | "foreign"): number {
-  return s.meta.memory.filter((m) => m.kind === kind).length;
-}
-
-export function addMemory(
-  s: GameState,
-  frag: { id: string; kind: "own" | "hanna" | "foreign"; text: string },
-): boolean {
+export function addMemory(s: GameState, frag: MemoryFragment): boolean {
   if (hasMemory(s, frag.id)) return false;
   s.meta.memory.push(frag);
   return true;
 }
 
-// ---- предметы
+// ---- предметы, флаги, счётчики
 
-export function has(s: GameState, item: ItemId): boolean {
+export function has(s: GameState, item: string): boolean {
   return s.run.items.includes(item);
 }
 
-export function give(s: GameState, item: ItemId): void {
+export function give(s: GameState, item: string): void {
   if (!has(s, item)) s.run.items.push(item);
 }
 
-export function take(s: GameState, item: ItemId): void {
+export function take(s: GameState, item: string): void {
   const i = s.run.items.indexOf(item);
   if (i >= 0) s.run.items.splice(i, 1);
-}
-
-export function useItem(s: GameState, item: ItemId): void {
-  if (ITEMS[item].consumable) take(s, item);
-}
-
-// ---- прочее
-
-export function flag(s: GameState, f: string): boolean {
-  return s.run.flags.has(f);
-}
-
-/** Сцена ещё ни разу не показывалась за всё время игры. */
-export function neverSeen(s: GameState, sceneId: string): boolean {
-  return (s.meta.seenScenes[sceneId] ?? 0) === 0;
 }
 
 export function rep(s: GameState, who: string, delta: number): void {
@@ -166,7 +155,7 @@ export function repOf(s: GameState, who: string): number {
   return s.meta.reputation[who] ?? 0;
 }
 
-export function unlockClient(s: GameState, c: Client): void {
+export function unlockClient(s: GameState, c: string): void {
   if (!s.meta.unlockedClients.includes(c)) s.meta.unlockedClients.push(c);
 }
 

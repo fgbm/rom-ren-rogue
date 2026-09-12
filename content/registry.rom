@@ -1,0 +1,133 @@
+# Реестр: служебные сцены, пороги памяти, предметы, персонажи, фракции, заказчики.
+# Флаги объявляются рядом с местом, где ставятся (в файле заказа). Здесь только общие.
+
+config intercept=turing_intercept flatline=flatline unload=unload load=load first=velt_01
+ladder 3 5 8 10 12 15 18 25
+
+# ---------------------------------------------------------------- предметы
+
+item ice_old "старый ледокол"
+  Пиратский «Оно-Сэндай» трёхлетней давности. Тот самый. Ломает белый лёд, но шумит.
+item ice_kuang "«Куан» 11"
+  Китайский военный ледокол. Входит в лёд тихо. Одноразовый по лицензии, но лицензии нет.
+item mask "маска-имитатор" [consumable]
+  Подменяет сигнатуру деки на чужую. Сбрасывает внимание Тьюринга. Одна на забег.
+item patch "патч носителя" [consumable]
+  Восстанавливает целостность носителя после чёрного льда. Морияма делает их вручную.
+item manifest "лист на Фрисайд"
+  Маршрутный лист Тессье-Эшпул. Без него шаттл на орбиту не берёт.
+item ticket "билет на маглев"
+  Тиба — Бостон-Центральная. Груз декларируется отдельно. ROM это груз.
+item simstim "симстим-канал"
+  Канал к нервной системе Виейры. Ты видишь то, что видит он. Он это знает.
+item dub "даб Дзиона"
+  Запись с орбитального узла растафари. Кто её принесёт, того пустят в доки.
+item marsh_paper "бумага Марш"
+  Охранная грамота Тьюринга на носитель. Снимает внимание. Обязывает.
+item shard "осколок конструкта" [consumable]
+  Фрагмент чужого ROM. Не читается. Тишина знает, что с ним делать. Кёниг знает, почём.
+item registry "реестр активов"
+  Опись имущества Тессье-Эшпул. Тысячи строк, ни одного названия. Ядро числится как ПО.
+item lang_map "карта Ланга"
+  Кусок карты тоннелей Блуждающего Огня, по памяти. Третий поворот не там.
+item lobotomy "лоботомирующий софт" [consumable]
+  Тьюринговский. Стирает всё выше порога. Оставляет то, что ниже.
+
+# ---------------------------------------------------------------- персонажи
+
+character ren "Рен"
+character viejra "Виейра" aliases "Ландо"
+character moriyama "Морияма"
+character marsh "Марш" aliases "Инспектор Марш"
+character silence "Тишина"
+character velt "Вельт"
+character zero "Брат Ноль" aliases "Ноль"
+character hanna "Ханна"
+character rask "Раск"
+character koenig "Кёниг" aliases "Мадам Кёниг"
+character sato "Сато"
+character pol "Поль"
+character rust "Ржа"
+character lang "Ланг"
+character peu "Пеу"
+character airol "Эйрол"
+character oldman "Старик"
+character neighbour "Сосед"
+character yakuza "Якудза"
+character cowboy "Ковбой"
+character controller "Контролёр"
+character turing "Тьюринг" aliases "Серый"
+character lawyer "Юрист"
+character head "Голова"
+character dealer "Дилер"
+character recruiter "Вербовщик"
+character flock "Паства"
+character junkman "Старьёвщик"
+character nurse "Сестра"
+character pilot "Пилот"
+character voice "Голос"
+
+# ---------------------------------------------------------------- фракции и общие флаги
+
+faction viejra marsh turing velt zero zion moriyama hanna sato koenig street yakuza
+
+flag intercepted "Тьюринг уже перехватывал в этом забеге (ставит движок)"
+flag told_moriyama "сказала Морияме правду о памяти"
+flag lied_moriyama "солгала Морияме о памяти"
+flag saw_string "видела строку на льду в этом забеге"
+flag clean_ice "рейд прошёл тихо"
+flag marsh_knows "Марш знает, что Рен помнит"
+flag marsh_deal "сделка с Марш в этом забеге"
+flag fleeing "бежит от Тьюринга"
+flag via_zion "прилетела в контейнере Дзиона"
+flag zion_promise "обещала Эйролу спросить голову"
+flag library "была в библиотеке в этом забеге"
+flag library_truth "спросила главное в библиотеке"
+flag met_pol "говорила с Полем в этом забеге"
+flag rust_touched "Ржа касался в этом забеге"
+flag named_self "назвала себя Рен вслух"
+flag viejra_partner "Виейра говорил как с партнёром"
+
+# ---------------------------------------------------------------- заказчики
+
+client velt "Вельт"
+  label Ликвидатор. Достать, вернуть на баланс. 3000 на счету.
+  credit 3000
+  attention 1
+  items ice_old
+  unlocked
+client marsh "Марш"
+  label Тьюринг. Найти, указать. Бумага бюро, 800 на счету.
+  credit 800
+  attention 0
+  items ice_old marsh_paper
+client zero "Брат Ноль"
+  label Культ. Спрятать от всех. Даб Дзиона, 600 на счету.
+  credit 600
+  attention 1
+  items ice_old dub
+client moriyama "Морияма"
+  label Клиника. Пройти дорогу, ничего не неся. Патч, 900 на счету.
+  credit 900
+  attention 1
+  items ice_old patch
+client hanna "Ханна"
+  label Оригинал. Принести ей. 2000 на счету, Тьюринг уже смотрит.
+  credit 2000
+  attention 2
+  items ice_old
+client sato "Сато"
+  label Оно-Сэндай. Урегулировать. 4000 на счету, бюро оплачено.
+  credit 4000
+  attention 0
+  items ice_old
+client koenig "Кёниг"
+  label Скупка. Собрать лот. Осколок в деке, 1000 на счету.
+  credit 1000
+  attention 1
+  items ice_old shard
+client silence "—"
+  label Никто не платил. Ничего не нести. Пустой счёт, пустая дека.
+  credit 0
+  attention 1
+  items
