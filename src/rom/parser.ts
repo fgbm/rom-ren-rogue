@@ -520,6 +520,7 @@ function parseOrder(n: Node, h: Head): Order {
     if (k === "requires") o.requires = parseExpr(v, c.src);
     else if (k === "start") o.start = ident(v, "стартовой локации", c.src);
     else if (k === "finish") o.finish = ident(v, "сцены развязки", c.src);
+    else if (k === "fail") o.fail = ident(v, "сцены провала", c.src);
     else if (k === "done") o.done = parseExpr(v, c.src);
     else if (k === "brief") o.brief = parseParas(c.children, false).paras;
     else throw new RomError(`неизвестное поле заказа «${k}»`, c.src);
@@ -571,7 +572,7 @@ function put<T extends { src: Src }>(map: Record<string, T>, id: string, v: T, w
 
 export function compile(units: Unit[]): Program {
   const prog: Program = {
-    config: { intercept: "", flatline: "", unload: "", load: "", first: "" },
+    config: { intercept: "", flatline: "", unload: "", load: "", first: "", fail: "", sold: "" },
     ladder: [],
     items: {},
     characters: {},
@@ -593,10 +594,11 @@ export function compile(units: Unit[]): Program {
         case "config": {
           if (configSeen) throw new RomError("config объявлен дважды", n.src);
           configSeen = true;
-          for (const k of ["intercept", "flatline", "unload", "load", "first"] as const) {
+          for (const k of ["intercept", "flatline", "unload", "load", "first", "fail"] as const) {
             if (!h.params[k]) throw new RomError(`config без ${k}=`, n.src);
             prog.config[k] = ident(h.params[k], k, n.src);
           }
+          if (h.params.sold) prog.config.sold = ident(h.params.sold, "sold", n.src);
           break;
         }
         case "ladder":

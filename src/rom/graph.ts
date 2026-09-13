@@ -8,6 +8,9 @@ function q(s: string): string {
 
 export function scenesDot(p: Program): string {
   const out: string[] = ["digraph scenes {", "  rankdir=LR;", "  node [shape=box fontname=monospace fontsize=9];"];
+  const failScenes = new Set<string>();
+  for (const o of Object.values(p.orders)) if (o.fail) failScenes.add(o.fail);
+  failScenes.add(p.config.fail);
   const byOrder = new Map<string, string[]>();
   for (const s of Object.values(p.scenes)) {
     const k = s.order ?? (s.loc ? `loc:${s.loc.split(".")[0]}` : "meta");
@@ -21,6 +24,7 @@ export function scenesDot(p: Program): string {
       const s = p.scenes[id];
       const attrs: string[] = [];
       if (s.dead) attrs.push('color=red', `label=${q(`${id}\\n[dead:${s.dead}]`)}`);
+      else if (failScenes.has(id)) attrs.push("color=orange", `label=${q(`${id}\\n[fail]`)}`);
       else if (s.key) attrs.push("color=goldenrod", "penwidth=2");
       else if (s.pool) attrs.push("style=dashed");
       if (s.silence || s.rust) attrs.push("fontcolor=slateblue");

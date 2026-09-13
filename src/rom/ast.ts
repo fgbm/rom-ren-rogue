@@ -121,6 +121,8 @@ export interface Order {
   requires?: Expr;
   start: string;
   finish: string;
+  /** Сцена провала: показывается, когда заказ стал невыполним (см. dead:refusal). */
+  fail?: string;
   done: Expr;
   brief: Para[];
   src: Src;
@@ -164,6 +166,10 @@ export interface Config {
   unload: string;
   load: string;
   first: string;
+  /** Общая сцена провала; заказ может переопределить полем fail. */
+  fail: string;
+  /** Сцена GAME OVER: владелец продаёт носитель после серии провалов. Опциональна. */
+  sold: string;
 }
 
 export interface Program {

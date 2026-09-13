@@ -19,13 +19,14 @@ export const VARS = new Set([
   "attention",
   "integrity",
   "runs",
+  "debt",
   "client",
   "act",
   "loc",
   "order",
 ]);
 
-export const FUNCS = new Set(["has", "flag", "rep", "seen", "visited", "done", "memory", "ending"]);
+export const FUNCS = new Set(["has", "flag", "rep", "seen", "visited", "done", "failed", "memory", "ending"]);
 
 type Tok =
   | { t: "num"; v: number }

@@ -374,7 +374,6 @@ location bama.spaceport act=2 "Космопорт БАМА"
       rep zion +1
   exit "Через сканер по бумаге бюро." -> freeside.docks [item marsh_paper] [when !has(manifest)]
       rep marsh +1
-  exit "Заплатить контролёру." -> freeside.docks [cost 1500] [when !has(manifest) && !has(dub)]
 
 scene spaceport_scanner [pool] loc=bama.spaceport
   when attention >= 3 && !has(marsh_paper)

@@ -26,6 +26,24 @@ export interface LintResult {
 
 export const SPEAKER_RE = /^([^:\n]{1,32}): — /;
 
+/**
+ * Заказы, к которым квота dead% не применяется: развязки линий и «откровения»,
+ * где по брифу тупиков нет или их мало (docs/writing-guide.md). Финальные заказы
+ * ведут к концовкам, а не в тупики.
+ */
+const DEAD_EXEMPT = new Set([
+  "velt_12",
+  "marsh_04",
+  "hanna_03",
+  "silence_01",
+  "mori_03",
+  "mori_04",
+  "sato_04",
+  "koenig_03",
+  "koenig_04",
+  "zero_04",
+]);
+
 export function lint(p: Program): LintResult {
   const diags: Diag[] = [];
   const err = (msg: string, src?: Src) => diags.push({ level: "error", msg, src });
@@ -35,8 +53,10 @@ export function lint(p: Program): LintResult {
   const locs = p.locations;
 
   // ---------------------------------------------------------- ссылки: config
-  for (const k of ["intercept", "flatline", "unload", "load"] as const)
+  for (const k of ["intercept", "flatline", "unload", "load", "fail"] as const)
     if (!scenes[p.config[k]]) err(`config ${k}= ссылается на несуществующую сцену ${p.config[k]}`);
+  if (p.config.sold && !scenes[p.config.sold])
+    err(`config sold= ссылается на несуществующую сцену ${p.config.sold}`);
   if (!p.orders[p.config.first]) err(`config first= ссылается на несуществующий заказ ${p.config.first}`);
 
   // ---------------------------------------------------------- ссылки: заказчики
@@ -48,6 +68,7 @@ export function lint(p: Program): LintResult {
     if (!p.clients[o.client]) err(`заказ ${o.id}: неизвестный заказчик ${o.client}`, o.src);
     if (!locs[o.start]) err(`заказ ${o.id}: неизвестная стартовая локация ${o.start}`, o.src);
     if (!scenes[o.finish]) err(`заказ ${o.id}: неизвестная сцена развязки ${o.finish}`, o.src);
+    if (o.fail && !scenes[o.fail]) err(`заказ ${o.id}: неизвестная сцена провала ${o.fail}`, o.src);
   }
 
   // ---------------------------------------------------------- ссылки: сцены
@@ -85,6 +106,20 @@ export function lint(p: Program): LintResult {
 
   // ---------------------------------------------------------- ссылки: эффекты
   const flagsSet = new Set<string>();
+  /** В каких заказах ставится флаг: чтобы поймать ссылки на чужой забег. */
+  const flagSetOrders = new Map<string, Set<string>>();
+  const orderOfScene = (id: string): string => {
+    const sc = scenes[id];
+    if (!sc) return "";
+    if (sc.order) return sc.order;
+    // Сцены внутри файла заказа обычно не несут order=: атрибутируем по имени файла.
+    const m = /\/([^/]+)\.rom$/.exec(sc.src.file);
+    return m && p.orders[m[1]] ? m[1] : "";
+  };
+  const orderOfCtx = (ctx: string): string => {
+    const m = /^scene (\S+)$/.exec(ctx);
+    return m ? orderOfScene(m[1]) : "";
+  };
   const itemsGiven = new Set<string>();
   const memoryIds = new Set<string>();
   for (const c of Object.values(p.clients)) c.items.forEach((i) => itemsGiven.add(i));
@@ -99,7 +134,13 @@ export function lint(p: Program): LintResult {
         if (!p.items[e.item]) err(`${ctx}: take неизвестного предмета ${e.item}`, src);
         break;
       case "flag":
-        if (e.on) flagsSet.add(e.name);
+        if (e.on) {
+          flagsSet.add(e.name);
+          const o = orderOfCtx(ctx);
+          const set = flagSetOrders.get(e.name) ?? new Set<string>();
+          set.add(o);
+          flagSetOrders.set(e.name, set);
+        }
         if (!p.flags[e.name]) err(`${ctx}: необъявленный флаг ${e.name}`, src);
         break;
       case "rep":
@@ -124,7 +165,7 @@ export function lint(p: Program): LintResult {
   }
 
   // ---------------------------------------------------------- ссылки: выражения
-  const flagsChecked = new Map<string, Src>();
+  const flagsChecked = new Map<string, { src: Src; order: string }[]>();
   for (const { e, src, ctx } of allExprs(p)) {
     walkExpr(e, (n: Expr) => {
       if (n.t === "call") {
@@ -134,7 +175,11 @@ export function lint(p: Program): LintResult {
             break;
           case "flag":
             if (!p.flags[n.arg]) err(`${ctx}: flag(${n.arg}): необъявленный флаг`, src);
-            flagsChecked.set(n.arg, src);
+            {
+              const reads = flagsChecked.get(n.arg) ?? [];
+              reads.push({ src, order: orderOfCtx(ctx) });
+              flagsChecked.set(n.arg, reads);
+            }
             break;
           case "rep":
             if (!p.factions.includes(n.arg)) err(`${ctx}: rep(${n.arg}): неизвестная фракция`, src);
@@ -147,6 +192,9 @@ export function lint(p: Program): LintResult {
             break;
           case "done":
             if (!p.orders[n.arg]) err(`${ctx}: done(${n.arg}): неизвестный заказ`, src);
+            break;
+          case "failed":
+            if (!p.orders[n.arg]) err(`${ctx}: failed(${n.arg}): неизвестный заказ`, src);
             break;
           case "memory":
             if (!memoryIds.has(n.arg)) warn(`${ctx}: memory(${n.arg}): такой фрагмент нигде не выдаётся`, src);
@@ -175,10 +223,100 @@ export function lint(p: Program): LintResult {
       }
     });
   }
-  for (const [f, src] of flagsChecked)
-    if (!flagsSet.has(f)) warn(`флаг ${f} проверяется, но нигде не ставится`, src);
+  for (const [f, reads] of flagsChecked) {
+    if (!flagsSet.has(f)) {
+      warn(`флаг ${f} проверяется, но нигде не ставится`, reads[0].src);
+      continue;
+    }
+    const setOrders = flagSetOrders.get(f) ?? new Set<string>();
+    const inOrders = [...setOrders].filter(Boolean);
+    for (const r of reads)
+      if (r.order && inOrders.length && !setOrders.has(r.order) && !setOrders.has(""))
+        err(
+          `флаг ${f} ставится только в заказах ${inOrders.join(", ")}; в заказе ${r.order} он не выставится (флаги живут один забег)`,
+          r.src,
+        );
+  }
   for (const it of Object.values(p.items))
     if (!itemsGiven.has(it.id)) warn(`предмет ${it.id} объявлен, но никогда не выдаётся`, it.src);
+
+  // ---------------------------------------------------------- soft-lock
+  // Key/pool-сцена, которая ЕДИНСТВЕННАЯ выдаёт обязательный для done факт, но
+  // даёт escape-выбор (-> @hub/@next/@go) без него: заказ можно загнать в
+  // состояние, где развязка недостижима, а провал не запущен.
+  const giveByFact = new Map<string, Set<string>>();
+  const setByFact = new Map<string, Set<string>>();
+  const noteFact = (m: Map<string, Set<string>>, key: string, scene: string) => {
+    const s = m.get(key) ?? new Set<string>();
+    s.add(scene);
+    m.set(key, s);
+  };
+  const noteEffect = (e: Effect, scene: string) => {
+    if (e.t === "give") noteFact(giveByFact, e.item, scene);
+    else if (e.t === "flag" && e.on) noteFact(setByFact, e.name, scene);
+    else if (e.t === "chance") for (const x of e.effects) noteEffect(x, scene);
+  };
+  for (const s of Object.values(scenes)) {
+    for (const e of s.enter) noteEffect(e, s.id);
+    for (const c of s.choices) for (const e of c.effects) noteEffect(e, s.id);
+  }
+  type Goal = { kind: "item" | "flag"; value: string };
+  const necessary = (e: Expr | undefined): Goal[] => {
+    if (!e) return [];
+    if (e.t === "call") {
+      if (e.fn === "flag") return [{ kind: "flag", value: e.arg }];
+      if (e.fn === "has") return [{ kind: "item", value: e.arg }];
+      return [];
+    }
+    if (e.t === "and") return [...necessary(e.a), ...necessary(e.b)];
+    return [];
+  };
+  const effectProvides = (e: Effect, g: Goal): boolean => {
+    if (e.t === "give") return g.kind === "item" && e.item === g.value;
+    if (e.t === "flag") return g.kind === "flag" && e.on && e.name === g.value;
+    if (e.t === "chance") return e.effects.some((x) => effectProvides(x, g));
+    return false;
+  };
+  const provides = (c: Choice, g: Goal): boolean => c.effects.some((e) => effectProvides(e, g));
+  for (const o of Object.values(p.orders)) {
+    const goals = necessary(o.done);
+    const seenGoals = new Set(goals.map((g) => `${g.kind}:${g.value}`));
+    for (let depth = 0; depth < 3; depth++) {
+      const next: Goal[] = [];
+      for (const g of [...goals]) {
+        const provs = g.kind === "item" ? giveByFact.get(g.value) : setByFact.get(g.value);
+        for (const sid of provs ?? []) {
+          for (const pg of necessary(scenes[sid]?.when)) {
+            const k = `${pg.kind}:${pg.value}`;
+            if (!seenGoals.has(k)) {
+              seenGoals.add(k);
+              next.push(pg);
+            }
+          }
+        }
+      }
+      goals.push(...next);
+      if (!next.length) break;
+    }
+    for (const g of goals) {
+      const provs = g.kind === "item" ? giveByFact.get(g.value) : setByFact.get(g.value);
+      if (!provs || provs.size !== 1) continue; // только единственный провайдер
+      const sid = [...provs][0];
+      const ps = scenes[sid];
+      // Key повторно срабатывает при входе в локацию; одноразовы только pool и once.
+      if (!ps || !(ps.pool || ps.once)) continue;
+      // Факт, который ставится уже при входе в сцену, выбором не теряется.
+      if (ps.enter.some((e) => effectProvides(e, g))) continue;
+      const esc = ps.choices.find(
+        (c) => (c.target.t === "hub" || c.target.t === "next" || c.target.t === "go") && !provides(c, g),
+      );
+      if (esc)
+        err(
+          `pool/once-сцена ${sid} — единственный источник факта ${g.kind === "item" ? "предмет" : "флаг"} ${g.value} для done заказа ${o.id}, но предлагает уход без него («${esc.text}»): заказ можно загнать в тупик`,
+          ps.src,
+        );
+    }
+  }
 
   // ---------------------------------------------------------- говорящие
   const names = new Set<string>();
@@ -209,8 +347,12 @@ export function lint(p: Program): LintResult {
   // достижимость
   const roots = new Set<string>();
   for (const s of Object.values(scenes)) if (s.key || (s.loc && s.pool)) roots.add(s.id);
-  for (const o of Object.values(p.orders)) roots.add(o.finish);
-  for (const k of ["intercept", "flatline", "unload", "load"] as const) roots.add(p.config[k]);
+  for (const o of Object.values(p.orders)) {
+    roots.add(o.finish);
+    if (o.fail) roots.add(o.fail);
+  }
+  for (const k of ["intercept", "flatline", "unload", "load", "fail"] as const) roots.add(p.config[k]);
+  if (p.config.sold) roots.add(p.config.sold);
   for (const l of Object.values(locs)) for (const x of l.exits) if (x.scene) roots.add(x.scene);
   const reach = new Set<string>();
   const stack = [...roots];
@@ -259,12 +401,12 @@ export function lint(p: Program): LintResult {
     }
   }
 
-  // развязка заказа ведёт только к выгрузке
-  for (const o of Object.values(p.orders)) {
-    const fin = scenes[o.finish];
-    if (!fin) continue;
+  // развязка (finish) и сцена провала (fail) ведут только к выгрузке
+  const checkTerminal = (sceneId: string, label: string) => {
+    const sc = scenes[sceneId];
+    if (!sc) return;
     const seen = new Set<string>();
-    const st = [fin.id];
+    const st = [sc.id];
     let hasUnload = false;
     while (st.length) {
       const id = st.pop()!;
@@ -273,11 +415,16 @@ export function lint(p: Program): LintResult {
       for (const c of scenes[id].choices) {
         if (c.target.t === "unload") hasUnload = true;
         else if (c.target.t === "scene") st.push(c.target.id);
-        else err(`развязка ${o.finish} заказа ${o.id} ведёт в ${describeTarget(c.target)}; после развязки только @unload`, c.src);
+        else err(`${label} ведёт в ${describeTarget(c.target)}; после неё только @unload`, c.src);
       }
     }
-    if (!hasUnload) err(`развязка ${o.finish} заказа ${o.id} не доходит до @unload`, fin.src);
+    if (!hasUnload) err(`${label} не доходит до @unload`, sc.src);
+  };
+  for (const o of Object.values(p.orders)) {
+    checkTerminal(o.finish, `развязка ${o.finish} заказа ${o.id}`);
+    if (o.fail) checkTerminal(o.fail, `сцена провала ${o.fail} заказа ${o.id}`);
   }
+  checkTerminal(p.config.fail, `config fail=${p.config.fail}`);
 
   // ---------------------------------------------------------- граф локаций
   const locReach = new Set<string>();
@@ -302,6 +449,7 @@ export function lint(p: Program): LintResult {
       .filter((s) => s.order === o.id)
       .map((s) => s.id)
       .concat(o.finish);
+    if (o.fail) st.push(o.fail);
     while (st.length) {
       const id = st.pop()!;
       if (own.has(id) || !scenes[id]) continue;
@@ -313,17 +461,21 @@ export function lint(p: Program): LintResult {
     let choices = 0;
     let dead = 0;
     let words = 0;
+    let hasRefusal = false;
     for (const id of own) {
       const s = scenes[id];
       words += countWords(s);
-      // Считаем только входы в тупик: выборы из живых сцен (не тупиков и не развязки).
-      if (s.dead || id === o.finish) continue;
+      if (s.dead === "refusal") hasRefusal = true;
+      // Считаем только входы в тупик: выборы из живых сцен (не тупиков, не развязки, не сцены провала).
+      if (s.dead || id === o.finish || id === o.fail) continue;
       choices += s.choices.length;
       dead += s.choices.filter((c) => c.dead || isDeadTarget(c)).length;
     }
     orders.push({ id: o.id, scenes: own.size, choices, dead, words });
-    if (choices && dead / choices < 0.2)
+    if (choices && dead / choices < 0.2 && !DEAD_EXEMPT.has(o.id))
       warn(`заказ ${o.id}: в тупик ведут ${dead} из ${choices} выборов (${Math.round((100 * dead) / choices)}%), нужно не меньше 20%`, o.src);
+    if (hasRefusal && !o.fail)
+      warn(`заказ ${o.id}: есть сцена отказа (dead:refusal), но нет поля fail; сработает общий config fail`, o.src);
   }
 
   return { diags, orders, ok: !diags.some((d) => d.level === "error") };

@@ -44,6 +44,7 @@ const stats = {
   unloadBy: new Map<string, number>(),
   endings: new Set<number>(),
   ordersDone: new Map<string, number>(),
+  ordersFailed: new Map<string, number>(),
   scenesSeen: new Set<string>(),
   locsSeen: new Set<string>(),
   stuck: 0,
@@ -55,6 +56,14 @@ let lastDead: string | null = null;
 const MAX_STEPS = 400;
 
 for (let guard = 0; guard < RUNS * MAX_STEPS * 2; guard++) {
+  if (view.ptr.kind === "title") {
+    // На Главной симулятор всегда продолжает существующий забег, иначе
+    // начинает новый; иначе «Начать заново» обнуляло бы статистику.
+    const cont = view.choices.findIndex((c) => c.kind === "continue");
+    const pick = cont >= 0 ? cont : view.choices.findIndex((c) => c.kind === "restart");
+    game.pick(pick >= 0 ? pick : 0);
+    continue;
+  }
   if (view.ptr.kind === "scene") {
     const sc = prog.scenes[view.ptr.id];
     stats.scenesSeen.add(sc.id);
@@ -62,7 +71,7 @@ for (let guard = 0; guard < RUNS * MAX_STEPS * 2; guard++) {
     if (sc.id === prog.config.unload) {
       stats.runs += 1;
       stats.steps.push(steps);
-      const by = state.run.finished ? "развязка" : lastDead ?? "прочее";
+      const by = state.run.finished ? "развязка" : state.run.failed ? "провал" : lastDead ?? "прочее";
       stats.unloadBy.set(by, (stats.unloadBy.get(by) ?? 0) + 1);
       steps = 0;
       lastDead = null;
@@ -72,6 +81,7 @@ for (let guard = 0; guard < RUNS * MAX_STEPS * 2; guard++) {
   if (view.ptr.kind === "hub") stats.locsSeen.add(state.run.loc);
   for (const e of state.meta.endings) stats.endings.add(e);
   for (const [k, v] of Object.entries(state.meta.ordersDone)) stats.ordersDone.set(k, v);
+  for (const [k, v] of Object.entries(state.meta.ordersFailed)) stats.ordersFailed.set(k, v);
 
   let open = view.choices.map((c, i) => ({ c, i })).filter((x) => !x.c.locked);
   // На экране выгрузки не стирать память: иначе статистика обнуляется.
@@ -107,6 +117,8 @@ for (const [k, v] of [...stats.unloadBy].sort((a, b) => b[1] - a[1])) console.lo
 console.log(`концовки: ${[...stats.endings].sort().join(", ") || "нет"}`);
 console.log("заказы выполнены:");
 for (const [k, v] of [...stats.ordersDone].sort()) console.log(`  ${k.padEnd(12)} ${v}`);
+console.log("заказы провалены:");
+for (const [k, v] of [...stats.ordersFailed].sort()) console.log(`  ${k.padEnd(12)} ${v}`);
 const allScenes = Object.keys(prog.scenes);
 const unseen = allScenes.filter((id) => !stats.scenesSeen.has(id));
 console.log(`сцен посещено ${stats.scenesSeen.size} из ${allScenes.length}`);

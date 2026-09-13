@@ -40,6 +40,8 @@ export function ctxOf(s: GameState, p: Program): EvalCtx {
           return s.run.integrity;
         case "runs":
           return s.meta.runs;
+        case "debt":
+          return s.meta.debt ?? 0;
         case "client":
           return s.run.client;
         case "act":
@@ -65,6 +67,8 @@ export function ctxOf(s: GameState, p: Program): EvalCtx {
           return s.run.visited.includes(arg) || s.run.visitedLocs.includes(arg);
         case "done":
           return s.meta.ordersDone[arg] ?? 0;
+        case "failed":
+          return s.meta.ordersFailed[arg] ?? 0;
         case "memory":
           return hasMemory(s, arg);
         case "ending":
@@ -129,9 +133,16 @@ export function applyEffect(e: Effect, s: GameState, p: Program, rng: Rng): bool
       if (!s.run.visitedLocs.includes(e.loc)) s.run.visitedLocs.push(e.loc);
       s.run.arrived = true;
       return false;
-    case "ending":
+    case "ending": {
       if (!s.meta.endings.includes(e.n)) s.meta.endings.push(e.n);
+      // Концовка засчитывает заказ выполненным, даже если сцена finish не показана.
+      const o = p.orders[s.run.order];
+      if (o && !s.run.finished) {
+        s.run.finished = true;
+        s.meta.ordersDone[o.id] = (s.meta.ordersDone[o.id] ?? 0) + 1;
+      }
       return false;
+    }
     case "wipe":
       return true;
     case "chance": {

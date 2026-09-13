@@ -90,8 +90,36 @@ body {
 #places ul { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
 #places li::before { content: "· "; }
 #places li.here { color: var(--fg); }
-#status .places-btn { cursor: pointer; border: 1px dashed #2a2f33; padding: 0 8px; user-select: none; margin-left: auto; }
+#status .places-btn { cursor: pointer; border: 1px dashed #2a2f33; padding: 0 8px; user-select: none; }
 #status .places-btn:hover, #status .places-btn.open { color: var(--fg); border-color: var(--fg); }
+#status .status-actions { margin-left: auto; display: inline-flex; gap: 16px; }
+
+/* ---- панель «заказ»: бриф текущего заказа */
+#order-brief {
+  font-size: 14px;
+  margin: -8px 0 24px;
+  border-left: 2px solid #2a2f33;
+  padding-left: 12px;
+}
+#order-brief:empty { display: none; }
+#order-brief .brief-head {
+  color: var(--dim);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+#order-brief p { margin: 0 0 0.8em; white-space: pre-wrap; }
+#order-brief p.line { padding-left: 1.2em; text-indent: -1.2em; }
+#order-brief p.line .who {
+  color: var(--dim);
+  font-size: 0.85em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+#order-brief p.memory { color: var(--accent); }
+#order-brief p.silence { color: var(--silence); font-style: italic; }
+#order-brief p.item { color: var(--dim); }
 
 #text p.rust { color: #c9906b; font-style: italic; letter-spacing: 0.02em; }
 #text p.echo { color: var(--fg); opacity: 0.85; }
@@ -102,3 +130,31 @@ body.dry #text p { line-height: 1.45; }
 #choices button.exit:hover { color: var(--accent); border-color: var(--accent); }
 .rust-mode #status, .rust-mode #choices button { opacity: 0.35; }
 .rust-mode { --silence: #c9906b; }
+
+/* ---- провал: заказ сорван, дека закрывается */
+.closing-mode #inventory, .closing-mode #places { opacity: 0.35; }
+.closing-mode #choices button:first-child { border-color: var(--accent); color: var(--accent); }
+
+/* ---- Главная страница */
+#status:empty { display: none; }
+#notice { color: var(--warn); font-size: 13px; margin: -16px 0 24px; }
+#notice:empty { display: none; }
+#art { margin: 0 0 24px; max-width: 100%; }
+#art:empty { display: none; }
+#art img { display: block; width: 100%; height: auto; }
+#art pre {
+  margin: 0;
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.15;
+  overflow-x: auto;
+  max-width: 100%;
+}
+#text p.subtitle { color: var(--dim); font-size: 0.95em; margin-bottom: 1.4em; }
+#glossary { color: var(--dim); font-size: 13px; margin: -8px 0 24px; }
+#glossary:empty { display: none; }
+#glossary dl { margin: 0; }
+#glossary dt { color: var(--fg); margin-top: 10px; }
+#glossary dd { margin: 2px 0 0; }
+#choices button.glossary-btn { color: var(--dim); border-color: #1f2326; }
+#choices button.glossary-btn:hover { color: var(--fg); border-color: var(--fg); }

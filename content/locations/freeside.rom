@@ -18,7 +18,9 @@ location freeside.docks act=3 "Доки Фрисайда"
       ~memory Ты помнишь, как пахнет тот, кто сидит в библиотеке. Пылью и озоном. Ты никогда там не была.
   exit "К лифту, на курорт." -> freeside.casino
   exit "В люк, в тоннели." -> straylight.t1
-  exit "Шаттл вниз, на Землю." -> bama.spaceport
+  exit "Шаттл вниз, на Землю, по листу." -> bama.spaceport [item manifest]
+  exit "Вниз, в контейнере Дзиона, по дабу." -> bama.spaceport [item dub]
+      flag +via_zion
 
 scene docks_airol [pool once] loc=freeside.docks
   enter

@@ -46,6 +46,9 @@ export function newRun(p: Program, orderId: string): RunState {
     visited: [],
     visitedLocs: [o.start],
     finished: false,
+    failed: false,
+    homeLeft: 0,
+    failedResolved: false,
     arrived: true,
   };
 }
@@ -60,15 +63,52 @@ export function saveRun(kv: KV, run: RunState, ptr: ViewPtr): void {
   kv.set(RUN_KEY, JSON.stringify(saved));
 }
 
-export function loadRun(kv: KV): { run: RunState; ptr: ViewPtr } | null {
+export type RunLoad =
+  | { kind: "none" }
+  | { kind: "corrupt" }
+  | { kind: "ok"; run: RunState; ptr: ViewPtr };
+
+/** Разбор сохранённого забега с различением «нет», «повреждено» и «ок». */
+export function loadRunStatus(kv: KV): RunLoad {
+  const raw = kv.get(RUN_KEY);
+  if (!raw) return { kind: "none" };
   try {
-    const raw = kv.get(RUN_KEY);
-    if (!raw) return null;
     const j = JSON.parse(raw) as SavedRun;
-    return { run: { ...j.run, flags: new Set(j.run.flags ?? []) }, ptr: j.ptr };
+    if (!j || typeof j !== "object" || !j.run || !j.ptr) return { kind: "corrupt" };
+    const r = j.run;
+    if (typeof r.order !== "string" || typeof r.client !== "string" || typeof r.loc !== "string")
+      return { kind: "corrupt" };
+    if (
+      !Number.isFinite(r.credit) ||
+      !Number.isFinite(r.attention) ||
+      !Number.isFinite(r.integrity)
+    )
+      return { kind: "corrupt" };
+    if (r.attention < 0 || r.attention > 5 || r.integrity < 0 || r.integrity > 3)
+      return { kind: "corrupt" };
+    if (!Array.isArray(r.items) || !Array.isArray(r.visited) || !Array.isArray(r.visitedLocs))
+      return { kind: "corrupt" };
+    if (!j.ptr || typeof j.ptr !== "object" || typeof j.ptr.kind !== "string" || !j.ptr.kind)
+      return { kind: "corrupt" };
+    return {
+      kind: "ok",
+      run: {
+        ...r,
+        flags: new Set(r.flags ?? []),
+        failed: !!r.failed,
+        homeLeft: r.homeLeft ?? 0,
+        failedResolved: !!r.failedResolved,
+      },
+      ptr: j.ptr,
+    };
   } catch {
-    return null;
+    return { kind: "corrupt" };
   }
+}
+
+export function loadRun(kv: KV): { run: RunState; ptr: ViewPtr } | null {
+  const load = loadRunStatus(kv);
+  return load.kind === "ok" ? { run: load.run, ptr: load.ptr } : null;
 }
 
 export function clearRun(kv: KV): void {
@@ -89,6 +129,9 @@ export function newMeta(p: Program): MetaState {
       .map((c) => c.id),
     endings: [],
     ordersDone: {},
+    ordersFailed: {},
+    failStreak: 0,
+    debt: 0,
   };
 }
 
