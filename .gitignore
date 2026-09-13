@@ -4,3 +4,4 @@ dist
 content/graph.*.dot
 .playwright-mcp
 docs/audit/
+PAPERCUTS.md
