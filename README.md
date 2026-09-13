@@ -25,7 +25,7 @@ npm run dev
 Сборка для GitHub Pages:
 
 ```
-GH_PAGES_BASE=/neuromancer-rogue/ npm run build
+GH_PAGES_BASE=/rom-ren-rogue/ npm run build
 ```
 
 Статика в `dist/`. Прогресс хранится в localStorage браузера.
