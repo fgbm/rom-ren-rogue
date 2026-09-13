@@ -3,3 +3,4 @@ dist
 .DS_Store
 content/graph.*.dot
 .playwright-mcp
+docs/audit/
