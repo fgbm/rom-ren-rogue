@@ -27,3 +27,22 @@ worktree/ветка) либо сначала закоммитить/отложи
 бандла не важна. Альтернатива — `npx playwright install chromium` под версию
 пакета.
 
+## 2026-09-13 15:57 — deepseek-v4.1-flash
+
+Первый деплой Pages на только что созданный репозиторий:
+`actions/configure-pages@v5` с `enablement: true` падает на `Create Pages site`
+с «Resource not accessible by integration» — `GITHUB_TOKEN` не может создать
+сайт, автовключение не срабатывает. Обход: включить Pages вручную
+(Settings → Pages → Source: GitHub Actions) либо один раз создать сайт
+пользовательским токеном: `gh api -X POST repos/OWNER/REPO/pages -f
+build_type=workflow`, после чего `enablement: true` уже проходит.
+
+## 2026-09-13 15:57 — deepseek-v4.1-flash
+
+`gh auth login` по умолчанию выдаёт scopes `gist, read:org, repo` без
+`workflow`, поэтому push коммита с файлом `.github/workflows/*.yml`
+отклоняется remote: «refusing to allow an OAuth App to create or update
+workflow ... without `workflow` scope». Обход: заранее
+`gh auth refresh -h github.com -s workflow` (снова device flow, одноразовый
+код).
+
